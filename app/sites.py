@@ -134,7 +134,49 @@ def list_sites():
 
 @bp.route("/<string:id>/update", methods=["GET", "POST"])
 def update_site(id: str):
-    pass
+    stack_name = id
+
+    if request.method == "POST":
+        file_url = request.form.get("file-url")
+        if file_url:
+            site_content = requests.get(file_url).text
+        else:
+            site_content = str(request.form.get("site-content"))
+
+        try:
+
+            def pulumi_program():
+                create_pulumi_program(str(site_content))
+
+            stack = auto.select_stack(
+                stack_name=stack_name,
+                project_name=current_app.config["PROJECT_NAME"],
+                program=pulumi_program,
+            )
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+            # deploy the stack, tailing the logs to stdout
+            stack.up(on_output=print)
+            flash(f"Site '{stack_name}' successfully updated!",
+                  category="success")
+        except auto.ConcurrentUpdateError:
+            flash(
+                f"Error: site '{stack_name}' already has an update in progress",
+                category="danger",
+            )
+        except Exception as exn:
+            flash(str(exn), category="danger")
+        return redirect(url_for("sites.list_sites"))
+
+    stack = auto.select_stack(
+        stack_name=stack_name,
+        project_name=current_app.config["PROJECT_NAME"],
+        # noop just to get the outputs
+        program=lambda: None,
+    )
+    outs = stack.outputs()
+    content_output = outs.get("website_content")
+    content = content_output.value if content_output else None
+    return render_template("sites/update.html", name=stack_name, content=content)
 
 
 @bp.route("/<string:id>/delete", methods=["POST"])
