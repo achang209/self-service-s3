@@ -60,3 +60,8 @@ def create_pulumi_program(content: str):
     pulumi.export("website_content", index_content)
     pulumi.export("s3_bucket_resourece", site_bucket)
 
+
+@bp.route("/new", methods=["GET"])
+def create_site():
+
+    return render_template("sites/create.html")
