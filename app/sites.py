@@ -139,4 +139,23 @@ def update_site(id: str):
 
 @bp.route("/<string:id>/delete", methods=["POST"])
 def delete_site(id: str):
-    pass
+    stack_name = id
+    try:
+        stack = auto.select_stack(
+            stack_name=stack_name,
+            project_name=current_app.config["PROJECT_NAME"],
+            # noop program for destroy
+            program=lambda: None,
+        )
+        stack.destroy(on_output=print)
+        stack.workspace.remove_stack(stack_name)
+        flash(f"Site '{stack_name}' successfully deleted!", category="success")
+    except auto.ConcurrentUpdateError:
+        flash(
+            f"Error: Site '{stack_name}' already has update in progress",
+            category="danger",
+        )
+    except Exception as exn:
+        flash(str(exn), category="danger")
+
+    return redirect(url_for("sites.list_sites"))
