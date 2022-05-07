@@ -63,5 +63,36 @@ def create_pulumi_program(content: str):
 
 @bp.route("/new", methods=["GET"])
 def create_site():
+    """creates new sites"""
+    if request.method == "POST":
+        stack_name = request.form.get("site-id")
+        file_url = request.form.get("file-url")
+        if file_url:
+            site_content = requests.get(file_url).text
+        else:
+            site_content = request.form.get("site-content")
+
+        def pulumi_program():
+            return create_pulumi_program(str(site_content))
+
+        try:
+            # create a new stack, generating our pulumi program on the fly from the POST body
+            stack = auto.create_stack(
+                stack_name=str(stack_name),
+                project_name=current_app.config["PROJECT_NAME"],
+                program=pulumi_program,
+            )
+            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
+            # deploy the stack, tailing the logs to stdout
+            stack.up(on_output=print)
+            flash(
+                f"Successfully created site '{stack_name}'", category="success")
+        except auto.StackAlreadyExistsError:
+            flash(
+                f"Error: Site with name '{stack_name}' already exists, pick a unique name",
+                category="danger",
+            )
+
+        return redirect(url_for("sites.list_sites"))
 
     return render_template("sites/create.html")
