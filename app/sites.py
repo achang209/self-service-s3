@@ -61,7 +61,7 @@ def create_pulumi_program(content: str):
     pulumi.export("s3_bucket_resourece", site_bucket)
 
 
-@bp.route("/new", methods=["GET"])
+@bp.route("/new", methods=["GET", "POST"])
 def create_site():
     """creates new sites"""
     if request.method == "POST":
@@ -96,3 +96,47 @@ def create_site():
         return redirect(url_for("sites.list_sites"))
 
     return render_template("sites/create.html")
+
+
+@bp.route("/", methods=["GET"])
+def list_sites():
+    """lists all sites"""
+    sites = []
+    org_name = current_app.config["PULUMI_ORG"]
+    project_name = current_app.config["PROJECT_NAME"]
+    try:
+        ws = auto.LocalWorkspace(
+            project_settings=auto.ProjectSettings(
+                name=project_name, runtime="python")
+        )
+        all_stacks = ws.list_stacks()
+        for stack in all_stacks:
+            stack = auto.select_stack(
+                stack_name=stack.name,
+                project_name=project_name,
+                # no-op program, just to get outputs
+                program=lambda: None,
+            )
+            outs = stack.outputs()
+            if 'website_url' in outs:
+                sites.append(
+                    {
+                        "name": stack.name,
+                        "url": f"http://{outs['website_url'].value}",
+                        "console_url": f"https://app.pulumi.com/{org_name}/{project_name}/{stack.name}",
+                    }
+                )
+    except Exception as exn:
+        flash(str(exn), category="danger")
+
+    return render_template("sites/index.html", sites=sites)
+
+
+@bp.route("/<string:id>/update", methods=["GET", "POST"])
+def update_site(id: str):
+    pass
+
+
+@bp.route("/<string:id>/delete", methods=["POST"])
+def delete_site(id: str):
+    pass

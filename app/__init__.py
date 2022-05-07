@@ -25,5 +25,9 @@ def create_app():
     def index():
         """index page"""
         return render_template("index.html")
+
+    from . import sites
+
+    app.register_blueprint(sites.bp)
     
     return app
