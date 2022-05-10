@@ -27,7 +27,7 @@ def create_pulumi_program(content: str):
     index_content = content
 
     # Write our index.html into the site bucket
-    s3.BucketObject(
+    bucket_object = s3.BucketObject(
         "index",
         bucket=site_bucket.id,
         content=index_content,
@@ -55,24 +55,26 @@ def create_pulumi_program(content: str):
         ),
     )
 
+    table_item = dynamodb.TableItem(
+        site_bucket.id.apply(
+            lambda id: f"table_item_{id}"
+        ),
+        table_name="s3-websites",
+        hash_key="bucket_id",
+        item=pulumi.Output.all(
+            site_bucket.id, site_bucket.website_endpoint, bucket_object.content).apply(
+                lambda args: json.dumps({
+                    "bucket_id": {"S": f"{args[0]}"},
+                    "website_url": {"S": f"{args[1]}"},
+                    "website_content": {"S": f"{args[2]}"}
+                })
+            )
+    )
+
     # Export the website URL
     pulumi.export("website_url", site_bucket.website_endpoint)
     pulumi.export("website_content", index_content)
-    pulumi.export("bucket", site_bucket.bucket)
-
-
-def create_pulumi_program_dynamodb(outputs):
-    item = dynamodb.TableItem(
-        f"tableItem{outputs['bucket']}",
-        table_name="s3-websites",
-        hash_key="bucket_id",
-        item=json.dumps({
-            "bucket_id": {"S": f"{outputs['bucket']}"},
-            "website_content": {"S": f"{outputs['website_content']}"},
-            "website_url": {"S": f"{outputs['website_url']}"} 
-        })
-    )
-    pulumi.export("item", item)
+    pulumi.export("item", table_item)
 
 
 @bp.route("/new", methods=["GET", "POST"])
