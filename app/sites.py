@@ -56,9 +56,7 @@ def create_pulumi_program(content: str):
     )
 
     table_item = dynamodb.TableItem(
-        site_bucket.id.apply(
-            lambda id: f"table_item_{id}"
-        ),
+        f"tableItem{pulumi.get_stack()}",
         table_name="s3-websites",
         hash_key="bucket_id",
         item=pulumi.Output.all(
@@ -109,32 +107,6 @@ def create_site():
                 f"Error: Site with name '{stack_name}' already exists, pick a unique name",
                 category="danger",
             )
-        
-        try:
-            # log resource to dynamoDB table
-            stack = auto.select_stack(
-                stack_name=str(stack_name),
-                project_name=current_app.config["PROJECT_NAME"],
-                # no-op program, just to get outputs
-                program=lambda: None,
-            )
-
-            outs = stack.outputs()
-            def pulumi_program_1():
-                return create_pulumi_program_dynamodb(outs)
-            stack = auto.create_stack(
-                stack_name=str(stack_name) + "-dynamodb",
-                project_name=current_app.config["PROJECT_NAME"],
-                program=pulumi_program_1,
-            )
-            stack.set_config("aws:region", auto.ConfigValue("us-east-1"))
-            # deploy the stack, tailing the logs to stdout
-            stack.up(on_output=print)
-            flash(
-                f"Successfully added item to DynamoDB", category="success")
-
-        except Exception as exn:
-            flash(str(exn), category="danger")
 
         return redirect(url_for("sites.list_sites"))
 
@@ -240,21 +212,6 @@ def delete_site(id: str):
             f"Error: Site '{stack_name}' already has update in progress",
             category="danger",
         )
-    except Exception as exn:
-        flash(str(exn), category="danger")
-
-    stack_name = id + "-dynamodb"
-    try:
-        stack = auto.select_stack(
-            stack_name=stack_name,
-            project_name=current_app.config["PROJECT_NAME"],
-            # noop program for destroy
-            program=lambda: None,
-        )
-        stack.destroy(on_output=print)
-        stack.workspace.remove_stack(stack_name)
-        flash(f"Tablem item for '{stack_name}' successfully deleted!", category="success")
-  
     except Exception as exn:
         flash(str(exn), category="danger")
 
